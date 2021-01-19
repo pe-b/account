@@ -5,6 +5,8 @@ import com.fishyRestaurant.account.exceptions.AccountNotFoundException;
 import com.fishyRestaurant.account.repositories.AccountRepository;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.IanaLinkRelations;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,8 +37,12 @@ public class AccountsController {
     }
 
     @PostMapping("/accounts")
-    Account createAccount(@RequestBody Account newAccount) {
-        return repository.save(newAccount);
+    ResponseEntity<?> createAccount(@RequestBody Account newAccount) {
+        EntityModel<Account> entityModel = accountModelAssembler.toModel(repository.save(newAccount));
+
+        return ResponseEntity
+          .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
+          .body(entityModel);
     }
 
     @GetMapping("/accounts/{id}")
@@ -46,23 +52,33 @@ public class AccountsController {
         return accountModelAssembler.toModel(account);
     }
 
-
     @PutMapping("/accounts/{id}")
-    Account editAccount(@RequestBody Account newAccount, @PathVariable Long id) {
-        return repository.findById(id).map(account -> {
-            account.setUsername(newAccount.getUsername());
-            account.setFullName(newAccount.getFullName());
-            account.setEmail(newAccount.getEmail());
-            account.setPhoneNumber(newAccount.getPhoneNumber());
-            return repository.save(account);
-        }).orElseGet(() -> repository.save(newAccount));
+    ResponseEntity<?> editAccount(@RequestBody Account newAccount, @PathVariable Long id) {
+        Account updatedAccount = repository.findById(id)
+          .map(account -> {
+              account.setUsername(newAccount.getUsername());
+              account.setFullName(newAccount.getFullName());
+              account.setEmail(newAccount.getEmail());
+              account.setPhoneNumber(newAccount.getPhoneNumber());
+              return repository.save(account);
+          }).orElseGet(() ->
+              repository.save(newAccount)
+          );
+
+        EntityModel<Account> entityModel = accountModelAssembler.toModel(updatedAccount);
+
+        return ResponseEntity
+          .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
+          .body(entityModel);
     }
 
     @DeleteMapping("accounts/{id}")
-    String deleteAccount(@PathVariable Long id) throws AccountNotFoundException{
+    ResponseEntity<?> deleteAccount(@PathVariable Long id) throws AccountNotFoundException{
         Account removedAccount = repository.findById(id).orElseThrow(() -> new AccountNotFoundException(id));
+
         repository.deleteById(id);
-        return removedAccount.toString();
+
+        return ResponseEntity.accepted().body(removedAccount);
     }
 
 
